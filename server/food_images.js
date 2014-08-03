@@ -1,6 +1,7 @@
 var Q = require('q'),
     fs = require('fs'),
-    request = require('request');
+    request = require('request'),
+    _ = require('underscore');
 
 var downloadImage = function (uri, filename, callback) {
   request.head(uri, function (err, res, body) {
@@ -13,23 +14,44 @@ var downloadImage = function (uri, filename, callback) {
 };
 
 
-module.exports = {
-  fetchImage: function (city, restaurant, dish) {
-    console.log('downloading an image for', city, restaurant, dish);
-    request('some/kimono/api/endpoint', function (error, response, body) {
-      var url = body.something;
-      downloadImage(
-        'https://www.google.com/images/srpr/logo3w.png',
-        city + restaurant + dish + '.png',
-        function () {
-          console.log('done');
+var self = {
+  fetchImage: function (city, restaurant, dish, callback) {
+    // Find the image from foodspotting
+    request({
+        url: 'https://www.kimonolabs.com/api/bsud6bkq?apikey=GVsRWtElKrFXWZEiOdJ1rmOqN6EEVxIv' + 
+            '&kimpath3=' + encodeURIComponent(restaurant + ' ' + dish) +
+            '&kimpath5=' + encodeURIComponent(city),
+        json: true
+      },
+      function (error, response, body) {
+      
+        // Pull the image source out
+        if (body && body.count && body.results.item && body.results.item.length &&
+          _.first(_.values(body.results.item[0]))) {
+            var url = _.first(_.values(body.results.item[0])).src;
+            
+            console.log('got url!', url);
+            
+            downloadImage(
+              url,
+              city + restaurant + dish + '.png',
+              function () {
+                console.log('successfully downloaded image');
+                callback(null, self.getImageUrl(city, restaurant, dish));
+              }
+            );
+        } else {
+          callback(
+            new Error('failed to fetch image for' + city + restaurant + dish),
+            null
+          );
         }
-      );
-    });
+      }
+    );
   },
   getImageUrl: function (city, restaurant, dish) {
     return '/image/' + city + restaurant + dish + '.png';
   }
 };
 
-
+module.exports = self;

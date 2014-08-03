@@ -5,8 +5,9 @@
   "private": true,
   "dependencies": {
     "express": "4.7.2",
-    "pg" : "3.4.0",
-    "ordrin-api" : "1.0.1",
-    "q" : "1.0.1"
+    "ordrin-api": "1.0.1",
+    "pg": "3.4.0",
+    "q": "1.0.1",
+    "underscore": "^1.6.0"
   }
 }
