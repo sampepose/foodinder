@@ -59,7 +59,11 @@ var self = {
   },
   getImageUrl: function (city, restaurant, dish) {
     return '/image/' + getName(city, restaurant, dish) + '.png';
-  }
+  },
+  imageExists: function (city, restaurant, dish) {
+    return fs.existsSync('public/image/' + getName(city, restaurant, dish) + '.png');
+  },
+
 };
 
 module.exports = self;

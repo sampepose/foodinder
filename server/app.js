@@ -9,12 +9,13 @@ app.use(express.static(__dirname + '/public'));
 
 clientAPI.setEndpoints(app);
 
+
 // var foodImages = require('./food_images');
 // foodImages.fetchImage('Mountain View', 'Vive Sol', 'Burrito', function (error, imageUrl) {
 //   if (error) {
 //     console.error(error.message);
 //   } else {
-//     console.log('success!', imageUrl);
+//     console.log('success!', imageUrl, foodImages.imageExists('Mountain View', 'Vive Sol', 'Burrito'));
 //   }
 // });
 
