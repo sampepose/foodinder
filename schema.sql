@@ -1,0 +1,27 @@
+DROP TABLE IF EXISTS Restaurant;
+DROP TABLE IF EXISTS Food;
+DROP TABLE IF EXISTS User;
+DROP TABLE IF EXISTS Like;
+
+CREATE TABLE Restaurant (
+  RID integer PRIMARY KEY NOT NULL
+);
+
+CREATE TABLE Food (
+  FID integer PRIMARY KEY NOT NULL,
+  RID integer FOREIGN KEY(Restaurant.RID) NOT NULL,
+  Name text NOT NULL,
+  ImagePath text UNIQUE NOT NULL
+);
+
+CREATE TABLE User (
+  UID serial PRIMARY KEY NOT NULL,
+  LastFoodReset timestamp NOT NULL DEFAULT now()
+);
+
+CREATE TABLE Like (
+  UID integer FOREIGN KEY(User.UID) NOT NULL,
+  FID integer FOREIGN KEY(Food.FID) NOT NULL,
+  Liked boolean NULL DEFAULT NULL,
+  PRIMARY KEY(UID, FID)
+);
