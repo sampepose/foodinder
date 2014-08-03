@@ -8,6 +8,7 @@
     "ordrin-api": "1.0.1",
     "pg": "3.4.0",
     "q": "1.0.1",
-    "underscore": "^1.6.0"
+    "underscore": "^1.6.0",
+    "request": "2.39.0"
   }
 }

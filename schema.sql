@@ -19,7 +19,7 @@ CREATE TABLE Food (
   RID integer NOT NULL,
   Name text NOT NULL,
   Price decimal NOT NULL,
-  ImagePath text UNIQUE,
+  ImagePath text UNIQUE NULL DEFAULT NULL,
   FOREIGN KEY (RID) REFERENCES Restaurant(RID)
 );
 

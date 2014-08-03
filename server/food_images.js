@@ -14,43 +14,51 @@ var downloadImage = function (uri, filename, callback) {
 };
 
 
+var getName = function (city, restaurant, dish) {
+  city = city.replace(/\s+/g, '').replace(/[()]/g,'');
+  restaurant = restaurant.replace(/\s+/g, '').replace(/[()]/g,'');
+  dish = dish.replace(/\s+/g, '').replace(/[()]/g,'');
+  return encodeURIComponent(city + '-' + restaurant + '-' + dish);
+}
+
 var self = {
-  fetchImage: function (city, restaurant, dish, callback) {
+  fetchImage: function (city, restaurant, dish, id, callback) {
     // Find the image from foodspotting
     request({
-        url: 'https://www.kimonolabs.com/api/bsud6bkq?apikey=GVsRWtElKrFXWZEiOdJ1rmOqN6EEVxIv' + 
+        url: 'https://www.kimonolabs.com/api/bqillbx4?apikey=KyQA8Fet0sy6SMIEAiXUR7trgdPg0eFM' +
             '&kimpath3=' + encodeURIComponent(restaurant + ' ' + dish) +
             '&kimpath5=' + encodeURIComponent(city),
         json: true
       },
       function (error, response, body) {
-      
         // Pull the image source out
-        if (body && body.count && body.results.item && body.results.item.length &&
-          _.first(_.values(body.results.item[0]))) {
-            var url = _.first(_.values(body.results.item[0])).src;
-            
-            console.log('got url!', url);
-            
+        if (body.count && body.lastrunstatus === "success"
+            && body.results.images && body.results.images.length &&
+          _.first(_.values(body.results.images[0]))) {
+            var url = _.first(_.values(body.results.images[0])).src;
+
+          //  console.log('got url!', url);
+
             downloadImage(
               url,
-              city + restaurant + dish + '.png',
+              getName(city, restaurant, dish) + '.png',
               function () {
-                console.log('successfully downloaded image');
-                callback(null, self.getImageUrl(city, restaurant, dish));
+              //  console.log('successfully downloaded image');
+                callback(null, self.getImageUrl(city, restaurant, dish), id);
               }
             );
         } else {
           callback(
             new Error('failed to fetch image for' + city + restaurant + dish),
-            null
+            null,
+            id
           );
         }
       }
     );
   },
   getImageUrl: function (city, restaurant, dish) {
-    return '/image/' + city + restaurant + dish + '.png';
+    return '/image/' + getName(city, restaurant, dish) + '.png';
   }
 };
 

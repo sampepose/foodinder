@@ -3,6 +3,8 @@
   // Initialize with your application secret key
   var ordrin_api = new  ordrin.APIs("44qby0ZpVX7xyc-bBbzrtKuVT9bvHAZ7yjbl2Mf2McE");
 
+  var food_images = require("./food_images");
+
   var Q = require("q");
 
   var pg = require('pg');
@@ -71,6 +73,7 @@
         });
 
         query.on('error', function (error) {
+          console.log("SQL ERROR: " + error);
 
           //           res.writeHead(200, {'Content-Type':'text/plain'});
           res.write(error + "\n \t from: " + query.text + '\n');
@@ -88,13 +91,13 @@
 
 
 
-      var isRestaurantInDB = function(rid, name, lat, long) {
+      var isRestaurantInDB = function(rid, name, lat, long, city) {
         var deferred = Q.defer();
-        doQuery(res, "SELECT Name FROM Food WHERE RID = $1;", [rid], function (res, results) {
+        doQuery(res, "SELECT * FROM Food WHERE RID = $1 AND imagepath IS NULL;", [rid], function (res, results) {
           if (results.length == 0)
-            deferred.reject({rid: rid, name: name, lat: lat, long: long});
+            deferred.reject(null);
             else
-              deferred.resolve(results);
+              deferred.resolve({foods: results, rid : rid, name: name, city: city});
             });
             return deferred.promise;
           }
@@ -111,6 +114,8 @@
             var deferred = Q.defer();
             ordrin_api.restaurant_details({rid: "" + rid}, function(err, data) {
               if (err != null) {
+                //console.log("Ordrin error: " + err);
+              //  console.log(err);
                 deferred.reject();
                 return;
               }
@@ -133,7 +138,7 @@
             for (var f in foods) {
               f = foods[f];
               doQuery(res, "INSERT INTO Food(FID, RID, Name, Price) VALUES($1,$2,$3,$4)",
-              [f.ID, rid, f.name, f.price], function() { deferred.resolve(); });
+              [f.ID, rid, f.name, f.price], function() { deferred.resolve(foods); });
             }
 
             // TODO: after doing all inserts, resolve the promise
@@ -149,12 +154,33 @@
                 var qs = "SELECT * FROM FOOD WHERE FID NOT IN (SELECT FID FROM Likes WHERE UID = $1 AND Liked IS NOT NULL)" +
                   " AND (RID = $2 OR RID = $3 OR RID = $4) AND Price <= $5" +
                   " LIMIT 3;"
-                  console.log(restaurantIDs);
                   var rid1 = restaurantIDs[Math.floor(Math.random()*restaurantIDs.length)];
                   var rid2 = restaurantIDs[Math.floor(Math.random()*restaurantIDs.length)];
                   var rid3 = restaurantIDs[Math.floor(Math.random()*restaurantIDs.length)];
                   doQuery(res, qs, [user, rid1, rid2, rid3, price]);
               }
+          }
+
+          var loadImages = function (res, rName, foods, city) {
+            var deferred = Q.defer();
+
+            for (var f in foods) {
+              f = foods[f];
+              food_images.fetchImage(city, rName, f.name, f.fid, function (error, imageUrl, fID) {
+                //  console.log(error);
+                if (error) {
+                  //console.error(error.message);
+                } else {
+                  console.log("SQL....");
+                  console.log(imageUrl);
+                  console.log(fID);
+                  var qs = "UPDATE Food SET ImagePath = $1 WHERE FID = $2;"
+                    doQuery(res, qs, [imageUrl, fID]);
+                }
+              });
+            }
+
+            return deferred.promise;
           }
 
           var restaurantIDs = [];
@@ -177,31 +203,49 @@
                   var name = restaurants[r].na;
                   var lat = restaurants[r].latitude;
                   var long = restaurants[r].longitude;
-                  isRestaurantInDB(rid, name, lat, long).then(
-                    function() { // in DB
+                  var c = restaurants[r].full_addr.city;
+                  isRestaurantInDB(rid, name, lat, long, c).then(
+                    function(data) { // in DB
+                      console.log("A1");
+                      var deferred = Q.defer();
+                      deferred.reject(data);
+                      return deferred.promise;
                     },
                     function(data) { // not in DB
+                      console.log("A2");
                       return addRestaurantToDB(data.rid, data.name, data.lat, data.long);
                     }
                   ).then(
                     function(rid) { //
+                      console.log("B1");
                       return loadFromOrdrIn(rid);
                       // do nothing           },
                     },
-                    function() {
+                    function(data) {
+                      console.log("B2");
+                      var deferred = Q.defer();
+                      deferred.reject(data);
+                      return deferred.promise;
                     }
                   ).then(
                     function(data) {
+                      console.log("C1");
                       return storeFoodsInDB(data.rid, data.foods);
                     },
-                    function() {
-                      res.end();
+                    function(data) {
+                      console.log("C2");
+                      var deferred = Q.defer();
+                      deferred.resolve(data);
+                      return deferred.promise;
                     }
                   ).then(
-                    function() {
-                      res.end();
+                    function(data) {
+                      console.log("D1\n---");
+                      if (data == null) return;
+                      return loadImages(res, data.name, data.foods, data.city);
                     },
                     function() {
+                      console.log("D2\n---");
                       res.end();
                     }
                   );
