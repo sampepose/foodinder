@@ -46,7 +46,7 @@
     return restaurants.filter(f);
   }
 
-  var doQuery = function (sql, data, cb) {
+  var doQuery = function (res, sql, data, cb) {
     var query = pgClient.query(sql, data);
     var affected_rows = [];
 
@@ -61,9 +61,9 @@
       else if (affected_rows.length > 0) {
         res.writeHead(200, {'Content-Type':'text/plain'});
         if (affected_rows.length == 1)
-          res.write(JSON.stringify(affected_rows[0]));
+          res.write(JSON.stringify(affected_rows[0], null, 4));
           else
-            res.write(JSON.stringify(affected_rows));
+            res.write(JSON.stringify(affected_rows, null, 4));
             res.end();
           } else {
             res.end();
@@ -79,7 +79,7 @@
       }
 
       var updateLikeFood = function (res, like, userID, foodID) {
-        doQuery("UPDATE Like SET Liked = $1 WHERE UID = $2 AND FID = $3;", [like, userID, foodID]);
+        doQuery(res, "UPDATE Like SET Liked = $1 WHERE UID = $2 AND FID = $3;", [like, userID, foodID]);
       }
 
       var getLikes = function (res, userID) {
@@ -90,7 +90,7 @@
 
       var isRestaurantInDB = function(rid, name, lat, long) {
         var deferred = Q.defer();
-        doQuery("SELECT Name FROM Food WHERE RID = $1;", [rid], function (res, results) {
+        doQuery(res, "SELECT Name FROM Food WHERE RID = $1;", [rid], function (res, results) {
           if (results.length == 0)
             deferred.reject({rid: rid, name: name, lat: lat, long: long});
             else
@@ -101,7 +101,7 @@
 
           var addRestaurantToDB = function(rid, name, lat, long) {
             var deferred = Q.defer();
-            doQuery("INSERT INTO Restaurant VALUES($1, $2, $3, $4)", [rid, name,lat,long], function (res, results) {
+            doQuery(res, "INSERT INTO Restaurant VALUES($1, $2, $3, $4)", [rid, name,lat,long], function (res, results) {
               deferred.resolve(rid);
             });
             return deferred.promise;
@@ -132,7 +132,7 @@
 
             for (var f in foods) {
               f = foods[f];
-              doQuery("INSERT INTO Food(FID, RID, Name, Price) VALUES($1,$2,$3,$4)",
+              doQuery(res, "INSERT INTO Food(FID, RID, Name, Price) VALUES($1,$2,$3,$4)",
               [f.ID, rid, f.name, f.price], function() { deferred.resolve(); });
             }
 
@@ -140,10 +140,26 @@
             return deferred.promise;
           }
 
+          var getFoods = function(res, user, price) {
+              if (restaurantIDs.length == 0) {
+                res.writeHead(200, {'Content-Type':'text/plain'});
+                res.write(JSON.stringify([]));
+                res.end();
+              } else {
+                var qs = "SELECT * FROM FOOD WHERE FID NOT IN (SELECT FID FROM Likes WHERE UID = $1 AND Liked IS NOT NULL)" +
+                  " AND (RID = $2 OR RID = $3 OR RID = $4) AND Price <= $5" +
+                  " LIMIT 3;"
+                  console.log(restaurantIDs);
+                  var rid1 = restaurantIDs[Math.floor(Math.random()*restaurantIDs.length)];
+                  var rid2 = restaurantIDs[Math.floor(Math.random()*restaurantIDs.length)];
+                  var rid3 = restaurantIDs[Math.floor(Math.random()*restaurantIDs.length)];
+                  doQuery(res, qs, [user, rid1, rid2, rid3, price]);
+              }
+          }
 
-          var getFoods = function (res, userID, address, city, zip, lat, long, price, distance) {
-            // TODO: Get a list of all foods from those restaurants within price range
-            // TODO: Get 4 random foods from that list
+          var restaurantIDs = [];
+          var onAppInit = function (res, userID, address, city, zip, lat, long, distance) {
+            restaurantIDs.length = 0;
             var args = {
               datetime: "ASAP",
               addr: "335 Pioneer Way",
@@ -157,34 +173,28 @@
 
                 for (var r in restaurants) {
                   var rid = restaurants[r].id;
+                  restaurantIDs.push(rid);
                   var name = restaurants[r].na;
                   var lat = restaurants[r].latitude;
                   var long = restaurants[r].longitude;
                   isRestaurantInDB(rid, name, lat, long).then(
                     function() { // in DB
-                      // do nothing
-                      console.log("A1");
                     },
                     function(data) { // not in DB
-                      console.log("A2");
                       return addRestaurantToDB(data.rid, data.name, data.lat, data.long);
                     }
                   ).then(
-                    function(rid) { // in DB
-                      console.log("B1");
+                    function(rid) { //
                       return loadFromOrdrIn(rid);
                       // do nothing           },
                     },
                     function() {
-                      console.log("B2");
                     }
                   ).then(
                     function(data) {
-                      console.log("C1");
                       return storeFoodsInDB(data.rid, data.foods);
                     },
                     function() {
-                      console.log("C2");
                       res.end();
                     }
                   ).then(
@@ -201,19 +211,18 @@
             }
 
             var setEndpoints = function (server) {
-              server.post('/api/like', function(req, re) {
-                res = re;
+              server.post('/api/like', function(req, res) {
                 updateLikeFood(res, true, req.param("user"), req.param("foodID"));
               });
-              server.post('/api/dislike', function(req, re) {
-                res = re;
+              server.post('/api/dislike', function(req, res) {
                 updateLikeFood(res, false, req.param("user"), req.param("foodID"));
               });
-              server.get('/food', function(req, re) {
-                res = re;
-                getFoods(res, req.param("user"), req.param("address"), req.param("city"),
-                req.param("zip"), req.param("lat"), req.param("long"), req.param("price"),
-                req.param("distance"));
+              server.get('/init', function(req, res) {
+                onAppInit(res, req.param("user"), req.param("address"), req.param("city"),
+                          req.param("zip"), req.param("lat"), req.param("long"), req.param("distance"));
+              });
+              server.get('/food', function(req, res) {
+                getFoods(res, req.param("user"), req.param("price"));
               });
             }
 
